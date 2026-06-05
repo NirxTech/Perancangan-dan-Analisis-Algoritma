@@ -15,91 +15,30 @@ import os
 warnings.filterwarnings('ignore')
 
 # ==========================================
-# 1. MEMBACA DATASET & PREPROCESSING (.xlsx)
+# 1. MEMBACA DATASET & PREPROCESSING (.csv)
 # ==========================================
-# Sesuaikan dengan nama file Excel kamu
+# Sesuaikan dengan nama file CSV kamu
 # Argparse untuk input file dan horizon prediksi
 parser = argparse.ArgumentParser(description='Analisis Curah Hujan: Holt-Winters, Decision Tree, Linear Regression')
-parser.add_argument('file', nargs='?', default='Dataset Curah Hujan.xlsx', help='Nama file Excel dataset (default: Dataset Curah Hujan.xlsx)')
+parser.add_argument('file', nargs='?', default='Dataset_Curah_Hujan_Kota_Padang/dataset_curah_hujan_teluk_bayur_2024_2025.csv', help='Nama file CSV dataset (default: Dataset_Curah_Hujan_Kota_Padang/dataset_curah_hujan_teluk_bayur_2024_2025.csv)')
 parser.add_argument('-H', '--horizon', type=int, default=12, help='Horizon prediksi dalam bulan (mis. 6, 12)')
 args = parser.parse_args()
 file_name = args.file
 FORECAST_HORIZON = max(1, int(args.horizon))
 
 try:
-    # Helper untuk membaca Excel historis dan mengubahnya ke time-series
-    bulan_map = {
-        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04",
-        "Mei": "05", "Juni": "06", "Juli": "07", "Agustus": "08",
-        "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
-    }
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    def to_timeseries_from_matrix(raw_df):
-        data_start = None
-        bulan_keys = set([b.title() for b in bulan_map.keys()])
-
-        for idx, row in raw_df.iterrows():
-            try:
-                val = str(row.iloc[0]).strip().title()
-            except Exception:
-                val = ''
-            if val in bulan_keys:
-                data_start = idx
+    if not os.path.isabs(file_name):
+        candidate_paths = [
+            file_name,
+            os.path.join(script_dir, file_name),
+            os.path.join(os.getcwd(), file_name),
+        ]
+        for candidate_path in candidate_paths:
+            if os.path.isfile(candidate_path):
+                file_name = candidate_path
                 break
-
-        if data_start is None:
-            for idx, row in raw_df.iterrows():
-                try:
-                    val = str(row.iloc[0]).strip().lower()
-                except Exception:
-                    val = ''
-                if val.startswith('jan'):
-                    data_start = idx
-                    break
-
-        year_header = None
-        if data_start is not None:
-            for j in range(data_start - 1, -1, -1):
-                row = raw_df.iloc[j].astype(str)
-                if row.str.contains(r"\d{4}").any():
-                    year_header = j
-                    break
-
-        if year_header is None and data_start is not None and data_start > 0:
-            year_header = data_start - 1
-
-        if data_start is None:
-            raise ValueError('Tidak dapat menemukan baris data bulan pada file Excel.')
-
-        if year_header is not None:
-            header_row = raw_df.iloc[year_header].fillna('').astype(str)
-            df_data = raw_df.iloc[data_start:].copy().reset_index(drop=True)
-            df_data.columns = header_row.values
-        else:
-            df_data = raw_df.iloc[data_start:].copy().reset_index(drop=True)
-            cols = ['Bulan'] + [f'Col{i}' for i in range(1, df_data.shape[1])]
-            df_data.columns = cols
-
-        kolom_bulan = df_data.columns[0]
-        df_melted = df_data.melt(id_vars=[kolom_bulan], var_name='Tahun', value_name='Curah_Hujan')
-        df_melted['Curah_Hujan'] = df_melted['Curah_Hujan'].astype(str).str.replace(',', '.', regex=False).str.strip()
-        df_melted['Curah_Hujan'] = pd.to_numeric(df_melted['Curah_Hujan'], errors='coerce')
-        df_melted[kolom_bulan] = df_melted[kolom_bulan].astype(str).str.strip().str.title()
-        df_melted['Bulan_Angka'] = df_melted[kolom_bulan].map(bulan_map)
-        df_melted = df_melted.dropna(subset=['Bulan_Angka', 'Curah_Hujan'])
-        df_melted['Tahun'] = df_melted['Tahun'].astype(str).str.strip()
-        df_melted['Tahun_Clean'] = df_melted['Tahun'].str.extract(r'(\d{4})')
-        mask_two_digit = df_melted['Tahun_Clean'].isna()
-        df_melted.loc[mask_two_digit, 'Tahun_Clean'] = df_melted.loc[mask_two_digit, 'Tahun'].str.extract(r'(\d{2})')
-        df_melted.loc[mask_two_digit & df_melted['Tahun_Clean'].notna(), 'Tahun_Clean'] = (
-            '20' + df_melted.loc[mask_two_digit & df_melted['Tahun_Clean'].notna(), 'Tahun_Clean']
-        )
-        df_melted = df_melted.dropna(subset=['Tahun_Clean'])
-        df_melted['Tahun'] = df_melted['Tahun_Clean']
-        df_melted = df_melted.drop(columns=['Tahun_Clean'])
-        df_melted['Bulan_Tahun'] = pd.to_datetime(df_melted['Tahun'] + '-' + df_melted['Bulan_Angka'], format='%Y-%m', errors='coerce')
-        df_melted = df_melted.dropna(subset=['Bulan_Tahun'])
-        return df_melted[['Bulan_Tahun', 'Curah_Hujan']]
 
     def load_csv_timeseries(csv_path):
         csv_df = pd.read_csv(csv_path)
@@ -137,29 +76,12 @@ try:
         out = out.dropna(subset=['Bulan_Tahun', 'Curah_Hujan'])
         return out
 
-    # 1) Load historis dari Excel
-    excel_raw = pd.read_excel(file_name, header=None)
-    df_excel = to_timeseries_from_matrix(excel_raw)
+    # 1) Load data dari satu file CSV
+    df_combined = load_csv_timeseries(file_name)
+    if df_combined is None or df_combined.empty:
+        raise ValueError(f"Data kosong atau format CSV tidak valid: {file_name}")
 
-    # 2) Load semua CSV dari folder Dataset_Curah_Hujan_Sumbar
-    csv_folder = 'Dataset_Curah_Hujan_Sumbar'
-    csv_frames = []
-    if os.path.isdir(csv_folder):
-        for item in os.listdir(csv_folder):
-            if item.lower().endswith('.csv'):
-                csv_path = os.path.join(csv_folder, item)
-                try:
-                    loaded_csv = load_csv_timeseries(csv_path)
-                    if loaded_csv is not None and not loaded_csv.empty:
-                        csv_frames.append(loaded_csv)
-                except Exception as csv_error:
-                    print(f"⚠️ Gagal membaca CSV '{item}': {csv_error}")
-    else:
-        print(f"⚠️ Folder '{csv_folder}' tidak ditemukan. Hanya data Excel yang digunakan.")
-
-    # 3) Gabungkan Excel + semua CSV, lalu agregasi mean per waktu
-    all_frames = [df_excel] + csv_frames if csv_frames else [df_excel]
-    df_combined = pd.concat(all_frames, ignore_index=True)
+    # 2) Agregasi mean per waktu
     df_combined['Bulan_Tahun'] = pd.to_datetime(df_combined['Bulan_Tahun'], errors='coerce')
     df_combined['Curah_Hujan'] = pd.to_numeric(df_combined['Curah_Hujan'], errors='coerce')
     df_combined = df_combined.dropna(subset=['Bulan_Tahun', 'Curah_Hujan'])
@@ -168,7 +90,7 @@ try:
     # Finalisasi dataframe yang siap pakai untuk algoritma di bawah
     df = df_combined
 
-    print("✅ Data Excel + CSV berhasil dimuat, digabung, dan diagregasi!\n")
+    print("✅ Data CSV berhasil dimuat dan diagregasi!\n")
     # Ringkasan singkat agar output lebih rapi
     try:
         print(f"Jumlah observasi setelah preprocessing: {len(df)}")
@@ -176,34 +98,27 @@ try:
             print(f"Rentang tanggal: {df['Bulan_Tahun'].min().strftime('%Y-%m')} sampai {df['Bulan_Tahun'].max().strftime('%Y-%m')}")
             print('\nContoh data (10 baris pertama):')
             print(df.head(10).to_string(index=False))
-            print(f"\nSumber CSV yang dibaca: {len(csv_frames)} file")
     except Exception:
         pass
 
     # Jika hasil preprocessing kosong, tampilkan informasi diagnostik dan hentikan program
     if df.empty:
-        print("⚠️ Hasil preprocessing menghasilkan dataframe kosong. Periksa format file Excel Anda.")
+        print("⚠️ Hasil preprocessing menghasilkan dataframe kosong. Periksa format file CSV Anda.")
         try:
             print('\n--- Cuplikan data mentah (df_raw.head()) ---')
-            print(df_raw.head().to_string(index=False))
+            print(df_combined.head().to_string(index=False))
         except Exception:
             pass
-        try:
-            print('\n--- Struktur kolom pada file Excel ---')
-            print(list(excel_raw.columns))
-        except Exception:
-            pass
-        print('\nPetunjuk: Pastikan Excel berisi matriks bulan-tahun dan CSV memiliki kolom waktu + curah hujan.')
+        print('\nPetunjuk: Pastikan CSV memiliki kolom tanggal/waktu dan curah hujan.')
         print('Jika format CSV berbeda, sesuaikan nama kolom waktu/nilai pada helper loader.')
         exit()
 
 except FileNotFoundError:
     print(f"❌ ERROR: File '{file_name}' tidak ditemukan.")
-    print("Pastikan file .xlsx berada di dalam folder yang sama dengan script ini.")
+    print("Pastikan file .csv berada di dalam folder yang sama dengan script ini.")
     exit()
 except ImportError:
-    print("❌ ERROR: Library 'openpyxl' belum terinstall.")
-    print("Jalankan perintah ini di terminal: pip install openpyxl")
+    print("❌ ERROR: Library yang dibutuhkan belum terinstall.")
     exit()
 except Exception as e:
     print(f"⚠️ Terjadi kesalahan saat memproses data: {e}")
