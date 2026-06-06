@@ -17,7 +17,7 @@ except Exception as e:
     missing = None
     if isinstance(e, ModuleNotFoundError):
         missing = e.name
-    print("❌ ERROR: Modul Python yang diperlukan tidak ditemukan.")
+    print("ERROR: Modul Python yang diperlukan tidak ditemukan.")
     if missing:
         print(f"   Modul hilang: {missing}")
     print("Solusi:")
@@ -28,7 +28,6 @@ except Exception as e:
     print("Setelah instalasi, jalankan ulang script.")
     sys.exit(1)
 
-# Menonaktifkan warning agar output di terminal lebih bersih
 warnings.filterwarnings('ignore')
 
 # ==========================================
@@ -144,7 +143,7 @@ try:
     # Finalisasi dataframe yang siap pakai untuk algoritma di bawah
     df = df_combined
 
-    print("✅ Data CSV berhasil dimuat dan diagregasi!\n")
+    print("Data CSV berhasil dimuat dan diagregasi!\n")
     # Ringkasan singkat agar output lebih rapi
     try:
         print(f"Jumlah observasi setelah preprocessing: {len(df)}")
@@ -157,7 +156,7 @@ try:
 
     # Jika hasil preprocessing kosong, tampilkan informasi diagnostik dan hentikan program
     if df.empty:
-        print("⚠️ Hasil preprocessing menghasilkan dataframe kosong. Periksa format file CSV Anda.")
+        print("Hasil preprocessing menghasilkan dataframe kosong. Periksa format file CSV Kamu.")
         try:
             print('\n--- Cuplikan data mentah (df_raw.head()) ---')
             print(df_combined.head().to_string(index=False))
@@ -168,21 +167,21 @@ try:
         exit()
 
 except FileNotFoundError:
-    print(f"❌ ERROR: File '{file_name}' tidak ditemukan.")
+    print(f"ERROR: File '{file_name}' tidak ditemukan.")
     print("Pastikan file .csv berada di dalam folder yang sama dengan script ini.")
     exit()
 except ImportError:
-    print("❌ ERROR: Library yang dibutuhkan belum terinstall.")
+    print("ERROR: Library yang dibutuhkan belum terinstall.")
     exit()
 except Exception as e:
-    print(f"⚠️ Terjadi kesalahan saat memproses data: {e}")
+    print(f"Terjadi kesalahan saat memproses data: {e}")
     exit()
 
 # ==========================================
 # 2. ALGORITMA 1: HOLT-WINTERS (PREDIKSI)
 # ==========================================
 print("="*50)
-print("📌 ALGORITMA 1: HOLT-WINTERS (PREDIKSI)")
+print("ALGORITMA 1: HOLT-WINTERS (PREDIKSI)")
 print("="*50)
 
 # Siapkan series dengan index datetime
@@ -193,7 +192,7 @@ prediksi_hw = None
 hw_method_desc = ''
 
 if n == 0:
-    print("⚠️ Data kosong — tidak ada yang bisa diproses untuk prediksi.")
+    print("Data kosong — tidak ada yang bisa diproses untuk prediksi.")
 else:
     try:
         # Jika tersedia setidaknya 2 siklus musiman (mis. 24 bulan), gunakan komponen musiman
@@ -226,7 +225,7 @@ else:
             pass
 
     except Exception as e:
-        print(f"⚠️ Holt-Winters gagal: {e}")
+        print(f"Holt-Winters gagal: {e}")
         prediksi_hw = None
 
 
@@ -234,7 +233,7 @@ else:
 # 3. ALGORITMA 2: DECISION TREE (KLASIFIKASI)
 # ==========================================
 print("\n" + "="*50)
-print("📌 ALGORITMA 2: DECISION TREE (KLASIFIKASI)")
+print("ALGORITMA 2: DECISION TREE (KLASIFIKASI)")
 print("="*50)
 
 # ==========================================
@@ -302,7 +301,7 @@ if dt_trained:
 # 4. ALGORITMA 3: LINEAR REGRESSION (TREN)
 # ==========================================
 print("\n" + "="*50)
-print("📌 ALGORITMA 3: LINEAR REGRESSION (ANALISIS TREN)")
+print("ALGORITMA 3: LINEAR REGRESSION (ANALISIS TREN)")
 print("="*50)
 
 # Membuat Index Waktu Numerik (1, 2, 3, ...) untuk regresi
@@ -335,16 +334,16 @@ if len(df) >= 2:
 
         print(f"Persamaan Regresi : y = {intercept:.2f} + {slope:.4f}x")
         if slope > 0:
-            print(f"📈 Kesimpulan Tren : MENINGKAT (Slope bernilai positif)")
+            print(f"Kesimpulan Tren : MENINGKAT (Slope bernilai positif)")
         elif slope < 0:
-            print(f"📉 Kesimpulan Tren : MENURUN (Slope bernilai negatif)")
+            print(f"Kesimpulan Tren : MENURUN (Slope bernilai negatif)")
         else:
-            print(f"➖ Kesimpulan Tren : STABIL / FLAT (Slope = 0)")
+            print(f"Kesimpulan Tren : STABIL / FLAT (Slope = 0)")
 
     except Exception as e:
-        print(f"⚠️ Linear Regression gagal: {e}")
+        print(f"Linear Regression gagal: {e}")
 else:
-    print("⚠️ Linear Regression membutuhkan setidaknya 2 observasi — dilewati.")
+    print("Linear Regression membutuhkan setidaknya 2 observasi — dilewati.")
 if lr_trained:
     try:
         y_true_lr = y_lr.astype(float)
@@ -368,7 +367,7 @@ try:
     # Simpan dataframe hasil dengan kategori
     out_df = df.copy()
     out_df.to_csv('results_summary.csv', index=False)
-    print("\n✅ Hasil ringkasan disimpan di: results_summary.csv")
+    print("\nHasil ringkasan disimpan di: results_summary.csv")
 except Exception as e:
     print(f"⚠️ Gagal menyimpan results_summary.csv: {e}")
 
@@ -378,9 +377,9 @@ if prediksi_hw is not None:
         future_dates = pd.date_range(start=df['Bulan_Tahun'].iloc[-1] + pd.DateOffset(months=1), periods=FORECAST_HORIZON, freq='MS')
         pred_df = pd.DataFrame({'Bulan_Tahun': future_dates, 'Prediksi_Curah_Hujan': [max(0, float(v)) for v in prediksi_hw]})
         pred_df.to_csv('prediksi_hw.csv', index=False)
-        print("✅ Prediksi Holt-Winters disimpan di: prediksi_hw.csv")
+        print("Prediksi Holt-Winters disimpan di: prediksi_hw.csv")
     except Exception as e:
-        print(f"⚠️ Gagal menyimpan prediksi_hw.csv: {e}")
+        print(f"Gagal menyimpan prediksi_hw.csv: {e}")
     # Penjelasan prediksi per-bulan dibandingkan rata-rata historis untuk bulan yang sama
     try:
         hist_monthly = series.groupby(series.index.month).mean()
@@ -479,7 +478,7 @@ if prediksi_hw is not None:
         boxfile = os.path.join(out_dir, 'boxplot_monthly.png')
         fig_box.tight_layout()
         fig_box.savefig(boxfile)
-        print(f"✅ Boxplot bulanan disimpan di: {boxfile}")
+        print(f"Boxplot bulanan disimpan di: {boxfile}")
 
         # 2) Heatmap year vs month (pivot) menggunakan seaborn
         pivot = df.pivot_table(index=df['Bulan_Tahun'].dt.month, columns=df['Bulan_Tahun'].dt.year, values='Curah_Hujan', aggfunc='mean')
@@ -492,9 +491,9 @@ if prediksi_hw is not None:
             ax_heat.set_ylabel('Bulan')
             fig_heat.tight_layout()
             fig_heat.savefig(heatfile)
-            print(f"✅ Heatmap bulanan-tahunan disimpan di: {heatfile}")
+            print(f"Heatmap bulanan-tahunan disimpan di: {heatfile}")
         else:
-            print("⚠️ Heatmap dilewati: data pivot kosong.")
+            print("Heatmap dilewati: data pivot kosong.")
 
         # 3) Rata-rata bulanan (bar chart) - seaborn
         monthly_avg = df.groupby(df['Bulan_Tahun'].dt.month)['Curah_Hujan'].mean().sort_index()
@@ -508,7 +507,7 @@ if prediksi_hw is not None:
         avgfile = os.path.join(out_dir, 'monthly_average.png')
         fig_avg.tight_layout()
         fig_avg.savefig(avgfile)
-        print(f"✅ Grafik rata-rata bulanan disimpan di: {avgfile}")
+        print(f"Grafik rata-rata bulanan disimpan di: {avgfile}")
         # Pastikan folder output ada
         os.makedirs('output_plots', exist_ok=True)
 
@@ -577,12 +576,10 @@ if prediksi_hw is not None:
             mainfile = os.path.join('output_plots', 'main_plot.png')
             fig.tight_layout(pad=3.0)
             fig.savefig(mainfile)
-            print(f"✅ Plot utama disimpan di: {mainfile}")
+            print(f"Plot utama disimpan di: {mainfile}")
         except Exception as e:
-            print(f"⚠️ Gagal menyimpan plot utama: {e}")
+            print(f"Gagal menyimpan plot utama: {e}")
 
         plt.show(block=True)
     except Exception as e:
-        print(f"⚠️ Error saat membuat visualisasi tambahan: {e}")
-
-    # (Plot utama telah dibuat dan disimpan sebelumnya menggunakan objek fig/axes.)
+        print(f"Error saat membuat visualisasi tambahan: {e}")
