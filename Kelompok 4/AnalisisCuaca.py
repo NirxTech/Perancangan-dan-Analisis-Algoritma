@@ -1,15 +1,32 @@
-import argparse
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.model_selection import cross_val_score
-import warnings
-import os
+import sys
+
+try:
+    import argparse
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    from sklearn.tree import DecisionTreeClassifier
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_absolute_error, mean_squared_error
+    from sklearn.model_selection import cross_val_score
+    import warnings
+    import os
+except Exception as e:
+    missing = None
+    if isinstance(e, ModuleNotFoundError):
+        missing = e.name
+    print("❌ ERROR: Modul Python yang diperlukan tidak ditemukan.")
+    if missing:
+        print(f"   Modul hilang: {missing}")
+    print("Solusi:")
+    print("  1) Pasang seluruh dependensi dari requirements.txt (direkomendasikan):")
+    print('     py -m pip install -r "Kelompok 4\\requirements.txt"')
+    print("  2) Atau pasang modul yang hilang saja, mis.:")
+    print("     py -m pip install pandas numpy matplotlib seaborn statsmodels scikit-learn openpyxl")
+    print("Setelah instalasi, jalankan ulang script.")
+    sys.exit(1)
 
 # Menonaktifkan warning agar output di terminal lebih bersih
 warnings.filterwarnings('ignore')
@@ -17,7 +34,6 @@ warnings.filterwarnings('ignore')
 # ==========================================
 # 1. MEMBACA DATASET & PREPROCESSING (.csv)
 # ==========================================
-# Sesuaikan dengan nama file CSV kamu
 # Argparse untuk input file dan horizon prediksi
 parser = argparse.ArgumentParser(description='Analisis Curah Hujan: Holt-Winters, Decision Tree, Linear Regression')
 parser.add_argument('file', nargs='?', default='Dataset_Curah_Hujan_Kota_Padang/dataset_curah_hujan_teluk_bayur_2024_2025.csv', help='Nama file CSV dataset (default: Dataset_Curah_Hujan_Kota_Padang/dataset_curah_hujan_teluk_bayur_2024_2025.csv)')
@@ -29,16 +45,54 @@ FORECAST_HORIZON = max(1, int(args.horizon))
 try:
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    if not os.path.isabs(file_name):
-        candidate_paths = [
-            file_name,
-            os.path.join(script_dir, file_name),
-            os.path.join(os.getcwd(), file_name),
+    def resolve_input_path(fname):
+        # If absolute path provided, accept if exists
+        if os.path.isabs(fname):
+            return fname if os.path.isfile(fname) else None
+
+        # Try several sensible relative locations
+        candidates = [
+            fname,
+            os.path.join(script_dir, fname),
+            os.path.join(os.getcwd(), fname),
+            os.path.join(script_dir, os.pardir, fname),
         ]
-        for candidate_path in candidate_paths:
-            if os.path.isfile(candidate_path):
-                file_name = candidate_path
+        for c in candidates:
+            c_norm = os.path.normpath(c)
+            if os.path.isfile(c_norm):
+                return c_norm
+
+        # Walk upwards from script_dir to root, trying the relative path at each level
+        cur = script_dir
+        while True:
+            try_path = os.path.normpath(os.path.join(cur, fname))
+            if os.path.isfile(try_path):
+                return try_path
+            parent = os.path.dirname(cur)
+            if parent == cur:
                 break
+            cur = parent
+
+        # If still not found, try to locate a file with the same basename under the project
+        target_basename = os.path.basename(fname)
+        search_root = os.path.abspath(os.path.join(script_dir, os.pardir))
+        for root, dirs, files in os.walk(search_root):
+            if target_basename in files:
+                return os.path.join(root, target_basename)
+
+        # Final fallback: search cwd tree
+        for root, dirs, files in os.walk(os.getcwd()):
+            if target_basename in files:
+                return os.path.join(root, target_basename)
+
+        return None
+
+    if not os.path.isabs(file_name):
+        resolved = resolve_input_path(file_name)
+        if resolved:
+            file_name = resolved
+        else:
+            raise FileNotFoundError(file_name)
 
     def load_csv_timeseries(csv_path):
         csv_df = pd.read_csv(csv_path)
